@@ -1,9 +1,11 @@
 import json;
 
 import live;
+from thread_about import thread_about;
 from send_update import send_update;
 
 # Variables
+json_error_str = 'Error parsing JSON configuration.\n\n(Please check that you had used double quotes ["], and not single quotes [\'].)';
 new_config = None;
 
 # Received request from WebSocket
@@ -15,24 +17,32 @@ def websocket_message(ws, message):
 	if request['type'] != 'update': return;
 
 	# Setup variables
+	global json_error_str;
 	global new_config;	
 	data = request['payload']['data']; # {body, stricken, author, created, etc.}
 	body = data['body'];
 
 	# Check for commands
-	# 'sidebar status'
 	if data['author'] != 'livecounting_sidebar':
-		if 'sidebar status' in body:
+		# 'sidebar help'
+		if 'sidebar help' in body:
+			send_update('[Information about me](https://www.reddit.com/r/livecounting_sidebar/wiki/index)');
+
+		# 'sidebar status'
+		elif 'sidebar status' in body:
 			send_update('Online');
 
-		# 'sidebar reset'
-		if 'sidebar reset' in body:
+		# 'sidebar reset' / 'count_better reset'
+		elif 'sidebar reset' in body or 'count_better reset' in body:
 			live.expected_count = None;
-			send_update('Reset');
+			live.last_counter = None;
 			print('Reset by /u/' +data['author']);
+			
+			if 'count_better reset' in body:
+				send_update('I will reset together with my fellow brethren');
 
 		# 'sidebar count'
-		if 'sidebar count' in body:
+		elif 'sidebar count' in body:
 			send_update(
 				'Next expected count: ' +
 				'{:,}'.format(live.expected_count)+
@@ -40,7 +50,7 @@ def websocket_message(ws, message):
 			);
 
 		# 'sidebar config print'
-		if 'sidebar config print' in body:
+		elif 'sidebar config print' in body:
 			send_update(
 				'Current configuration:\n\n'+
 				'\n'.join(
@@ -49,38 +59,60 @@ def websocket_message(ws, message):
 				)
 			);
 
-		# 'sidebar config'
-		if 'sidebar config' in body:
-			start = body.find('{');
-			end = body.find('}');
-			if start != -1 and end != -1:
-				# TODO: try-except if the JSON is invalid
-				# TODO: convert all values to string
-				new_config = json.loads(body[start : end + 1]);
-				send_update(
-					'New configuration:\n\n'+
-					'\n'.join(
-						[('    ' + line) for line in
-						 json.dumps(new_config, indent = 4, sort_keys = True).split('\n')]
-					)+
-					'\n\nUse "sidebar config confirm" to confirm the new configuration, or "sidebar config cancel" to cancel'
-				);
+		# The following commands are only usable by a few people
+		if (data['author'] == 'TOP_20' or
+			data['author'] == 'co3_carbonate' or		
+			data['author'] == 'KingCaspianX' or		
+			data['author'] == 'rschaosid' or		
+			data['author'] == 'artbn'):		
 
-		# 'sidebar config confirm'
-		if 'sidebar config confirm' in body:
-			if not new_config is None:
-				# TODO: write to special_numbers.json
-				live.special_numbers = new_config;
+			# 'sidebar config confirm'
+			if 'sidebar config confirm' in body:
+				if not new_config is None:
+					live.special_numbers = new_config;
+					
+					# write to special_numbers.json
+					json_str = json.dumps(live.special_numbers);
+					with open('special_numbers.json', 'w') as json_file:
+						json_file.write(json_str);
 
-				send_update('Confirmed');
-				print('Configuration changed to ' +json.dumps(live.special_numbers), ' by /u/' +data['author']);
-				new_config = None;
+					send_update('Confirmed');
+					print('Configuration changed to ' +json_str, ' by /u/' +data['author']);
+					new_config = None;
 
-		# 'sidebar config cancel'
-		if 'sidebar config cancel' in body:
-			if not new_config is None:
-				new_config = None;
-				send_update('Cancelled');
+			# 'sidebar config cancel'
+			elif 'sidebar config cancel' in body:
+				if not new_config is None:
+					new_config = None;
+					send_update('Cancelled');
+
+			# 'sidebar config'
+			elif 'sidebar config' in body:
+				start = body.find('{');
+				end = body.find('}');
+				if start != -1 and end != -1:
+					try:
+						new_config = json.loads(body[start : end + 1]);
+					except:
+						# in case of invalid JSON
+						send_update(json_error_str);
+						return;
+
+					# convert all JSON values to string
+					for k, v in new_config.items():
+						new_config[k] = str(v);
+
+					# announce
+					send_update(
+						'New configuration:\n\n'+
+						'\n'.join(
+							[('    ' + line) for line in
+							 json.dumps(new_config, indent = 4, sort_keys = True).split('\n')]
+						)+
+						'\n\nUse "sidebar config confirm" to confirm the new configuration, or "sidebar config cancel" to cancel'
+					);
+				else:
+					send_update(json_error_str);
 
 
 	# Detect count from the update's body
@@ -116,12 +148,17 @@ def websocket_message(ws, message):
 	);
 
 	# Change expected count
-	# TODO: double-count handling
 	if live.expected_count is None:
 		live.expected_count = int(num) + 1;
+		live.last_counter = data['author'];
+
+	elif data['author'] == live.last_counter:
+		# double counting, skip
+		return;
 
 	elif live.expected_count == int(num):
 		live.expected_count += 1;
+		live.last_counter = data['author'];
 
 	else:
 		# this count is false, skip remaining actions
@@ -134,7 +171,7 @@ def websocket_message(ws, message):
 		if suffix == v:
 			# congratulate
 			send_update(
-				'Congratulations to /u/{username} for getting the {name} ({number}s)!'
+				'Congratulations to {username} for getting the {name} ({number}s)!'
 				.format(
 					username = data['author'],
 					name = k,
@@ -151,17 +188,65 @@ def websocket_message(ws, message):
 				)
 			);
 			
-			# TODO: sidebar
-			# temporary solution
-			send_update(
-				'/u/dominodan123 /u/TOP_20 /u/artbn: [the {num} {name}](https://www.reddit.com/live/{thread}/updates/{id})\n\n(Note: Due to the current lack of technology, I am not able to automatically update the sidebar)'
+			# Now, the most important - actually updating the sidebar
+			# (old method when the tech was still shitty)
+			"""send_update(
+				'/u/dominodan123 /u/TOP_20 /u/artbn7: the [{num}](https://www.reddit.com/live/{thread}/updates/{id}) {name} by {username}\n\n(Note: Due to the current lack of technology, I am not able to automatically update the sidebar)'
 				.format(
 					num = '{:,}'.format(int(num)),
 					name = k,
+					username = data['author'],
 					thread = live.thread,
 					id = data['id']
 				)
+			);"""
+
+			# Get latest thread info, especially the sidebar contents
+			thread_info = (thread_about())['data'];
+			sidebar_contents = thread_info['resources'];
+
+			# Generate the sidebar_id from the name
+			sidebar_id = '[](#sidebar_' + ('_'.join(k.upper().split())) + ')';
+			
+			# Find index of the character immediately after sidebar_id in sidebar_contents
+			index = sidebar_contents.find(sidebar_id) + len(sidebar_id);
+
+			# Increment index until a non-whitespace character
+			loop_broke = False;
+			for i in range(index, len(sidebar_contents)):
+				if sidebar_contents[i].isspace():
+					index += 1;
+				else:
+					loop_broke = True;
+					break;
+
+			# Only proceed if there was a non-whitespace character afterwards
+			# i.e. the loop broke
+			if loop_broke == False: break;
+
+			# Insert at index the new point - number and the author, and a newline
+			sidebar_contents = (
+				sidebar_contents[:index] +
+				'* ' +
+				'[{:,}](https://www.reddit.com/live/{}/updates/{})'
+					.format(int(num), live.thread, data['id'])+
+				' - /u/' +data['author']+ '\n'+
+				sidebar_contents[index:]
 			);
+			
+			# Update the sidebar with Reddit API
+			response = live.reddit.request(
+				method = 'POST',
+				path = 'api/live/' +live.thread+ '/edit',
+				data = {
+					'api_type': 'json',
+					'description': thread_info['description'],
+					'nsfw': thread_info['nsfw'],
+					'resources': sidebar_contents,
+					'title': thread_info['title']
+				}
+			);
+
 
 			break;
 

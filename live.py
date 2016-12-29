@@ -12,29 +12,21 @@ with open('special_numbers.json') as json_file:
 # Next expected count
 expected_count = None;
 
+# Who said the last valid count (to prevent double counting)
+last_counter = None;
+
 # Reddit API (PRAW)
 # User authentication
 reddit = praw.Reddit(
-	client_id = '', # FILL THIS UP ACCORDINGLY
+	client_id = '', # HIDDEN
 	client_secret = '',
 	username = '',
 	password = '',
 	user_agent = ''
 );
 
-# Live thread
+# Live thread information
 thread = 'ta535s1hq2je';
 
 # WebSocket
 ws = None;
-
-
-# Global functions
-from send_update import send_update;
-
-def on_open(ws):
-	print('WebSocket connection opened');
-	send_update('Your friendly neighborhood bot has come online!');
-
-def on_close(ws):
-	print('WebSocket connection closed');
