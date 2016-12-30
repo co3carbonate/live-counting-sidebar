@@ -18,7 +18,7 @@ last_counter = None;
 # Reddit API (PRAW)
 # User authentication
 reddit = praw.Reddit(
-	client_id = '', # HIDDEN
+	client_id = '',
 	client_secret = '',
 	username = '',
 	password = '',

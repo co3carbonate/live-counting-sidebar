@@ -1,5 +1,4 @@
 # External modules
-import threading;
 import websocket;
 
 # Local modules
@@ -12,7 +11,7 @@ from websocket_message import websocket_message;
 # Connected
 def on_open(ws):
 	print('WebSocket connection opened');
-	#send_update('Your friendly neighborhood bot has come online!');
+	send_update('Your friendly neighborhood bot has come online!');
 
 # Disconnected
 retry = True;
@@ -44,6 +43,7 @@ def connect():
 
 # Main
 # Run connect in a separate thread
+import threading;
 thread = threading.Thread(target=connect);
 thread.start();
 

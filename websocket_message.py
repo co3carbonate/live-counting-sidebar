@@ -1,8 +1,10 @@
+import threading;
 import json;
 
 import live;
 from thread_about import thread_about;
 from send_update import send_update;
+from delete_update import delete_update;
 
 # Variables
 json_error_str = 'Error parsing JSON configuration.\n\n(Please check that you had used double quotes ["], and not single quotes [\'].)';
@@ -60,11 +62,11 @@ def websocket_message(ws, message):
 			);
 
 		# The following commands are only usable by a few people
-		if (data['author'] == 'TOP_20' or
-			data['author'] == 'co3_carbonate' or		
-			data['author'] == 'KingCaspianX' or		
-			data['author'] == 'rschaosid' or		
-			data['author'] == 'artbn'):		
+		elif(data['author'] == 'TOP_20' or
+			 data['author'] == 'co3_carbonate' or		
+			 data['author'] == 'KingCaspianX' or		
+			 data['author'] == 'rschaosid' or		
+			 data['author'] == 'artbn'):		
 
 			# 'sidebar config confirm'
 			if 'sidebar config confirm' in body:
@@ -113,7 +115,11 @@ def websocket_message(ws, message):
 					);
 				else:
 					send_update(json_error_str);
-
+	else:
+		# This was posted by livecounting_sidebar, delete after some time
+		thread = threading.Thread(target=lambda: delete_update(data['name'], 60));
+		thread.start();
+		return;
 
 	# Detect count from the update's body
 	num = '';
@@ -170,14 +176,14 @@ def websocket_message(ws, message):
 	for k, v in live.special_numbers.items():
 		if suffix == v:
 			# congratulate
-			send_update(
+			"""send_update(
 				'Congratulations to {username} for getting the {name} ({number}s)!'
 				.format(
 					username = data['author'],
 					name = k,
 					number = v
 				)
-			);
+			);""" # too spammy
 
 			# log
 			print(
@@ -209,7 +215,9 @@ def websocket_message(ws, message):
 			sidebar_id = '[](#sidebar_' + ('_'.join(k.upper().split())) + ')';
 			
 			# Find index of the character immediately after sidebar_id in sidebar_contents
-			index = sidebar_contents.find(sidebar_id) + len(sidebar_id);
+			index = sidebar_contents.find(sidebar_id) 
+			if index == -1: break;
+			index += len(sidebar_id);
 
 			# Increment index until a non-whitespace character
 			loop_broke = False;
@@ -222,7 +230,7 @@ def websocket_message(ws, message):
 
 			# Only proceed if there was a non-whitespace character afterwards
 			# i.e. the loop broke
-			if loop_broke == False: break;
+			#if loop_broke == False: break; # (currently has issues)
 
 			# Insert at index the new point - number and the author, and a newline
 			sidebar_contents = (
