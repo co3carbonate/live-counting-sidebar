@@ -122,13 +122,14 @@ def websocket_message(ws, message):
 		return;
 
 	# Detect count from the update's body
+	# (TODO: use the same system as count_better)
 	num = '';
 	for char in body:
 		if char.isdigit():
 			num += char;
 			continue;
 
-		elif (char == ' ' or char == ','):
+		elif (char == ' ' or char == ',' or char == '.'):
 			continue;
 
 		elif(char == '~' or char == '^' or char == '#' or
@@ -176,14 +177,14 @@ def websocket_message(ws, message):
 	for k, v in live.special_numbers.items():
 		if suffix == v:
 			# congratulate
-			"""send_update(
+			send_update(
 				'Congratulations to {username} for getting the {name} ({number}s)!'
 				.format(
 					username = data['author'],
 					name = k,
 					number = v
 				)
-			);""" # too spammy
+			);
 
 			# log
 			print(
