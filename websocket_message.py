@@ -66,7 +66,8 @@ def websocket_message(ws, message):
 			 data['author'] == 'co3_carbonate' or		
 			 data['author'] == 'KingCaspianX' or		
 			 data['author'] == 'rschaosid' or		
-			 data['author'] == 'artbn'):		
+			 data['author'] == 'artbn' or
+			 data['author'] == 'NumberOfTheDayBot'):		
 
 			# 'sidebar config confirm'
 			if 'sidebar config confirm' in body:
